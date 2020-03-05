@@ -194,19 +194,29 @@ for i = 231:NOCfiles
                             = insitu_remote_match{i,ilon}(insitu_remote_match{i,ilon}<0)+360;
                         colorbar(ax2,'northoutside','Visible','off'); cb2 = colorbar(ax2,'eastoutside','FontSize',15);
                         %%%%%%%%%%% change marker size
-                        m_scatter(insitu_remote_match{i,size(data,2)+4},insitu_remote_match{i,size(data,2)+3},...
-                            100,[0.5 0.5 0.5],'filled', 'Marker', 's');
+                        % plot area of match
+%                         m_scatter(insitu_remote_match{i,size(data,2)+4},insitu_remote_match{i,size(data,2)+3},...
+%                             100,[0.5 0.5 0.5],'filled', 'Marker', 's');
+                        pat = [insitu_remote_match{i,size(data,2)+4}(insitu_remote_match{i,end}>median(insitu_remote_match{i,end}))...
+                            insitu_remote_match{i,size(data,2)+3}(insitu_remote_match{i,end}>median(insitu_remote_match{i,end}))];
+                        c = mean(pat,1);
+                        d = pat-c ;
+                        th = atan2(d(:,2),d(:,1));
+                        [~, idpat] = sort(th);
+                        pat = pat(idpat,:);
+                        patf = [pat; pat(1,:)];
+                        m_patch(patf(:,1),patf(:,2), [0.85 0.85 0.85],'FaceAlpha',0.6);
                         ylabel(cb2, strrep(sprintf('%s (%s)', varargin{5}{1}, data.Properties.VariableUnits{id_plotinsitu}),'_',' '));
                         if isempty(data.Properties.VariableUnits{id_plotinsitu})
                             warning('In-situ unit missing')
                         end
                         %%%%%%%%%%% change marker size
+                        m_gshhs_i('patch',[0.7 0.7 0.7],'edgecolor',[0.7 0.7 0.7],'parent',ax);
                         sel_match_dt = insitu_remote_match{i,idt} > datetimeOC(1) & insitu_remote_match{i,idt} < datetimeOC(end);
                         m_scatter(insitu_remote_match{i,ilon}(sel_match_dt),insitu_remote_match{i,ilat}(sel_match_dt),...
                             100,insitu_remote_match{i,id_plotinsitu}(sel_match_dt),'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5);
                         m_scatter(insitu_remote_match{i,ilon}(sel_match_dt),insitu_remote_match{i,ilat}(sel_match_dt),...
                             100,insitu_remote_match{i,id_plotinsitu}(sel_match_dt),'filled');
-                        m_gshhs_i('patch',[0.7 0.7 0.7],'edgecolor',[0.7 0.7 0.7],'parent',ax);
                         caxis(ax, [min(min(remote{id_plotremote(size(data,2)+5:end-1)}))...
                             max(max(remote{id_plotremote(size(data,2)+5:end-1)}))]);
                         caxis(ax2, [min(insitu_remote_match{i,id_plotinsitu})...
@@ -220,7 +230,10 @@ for i = 231:NOCfiles
                         y_lim = ylim();
                         area([min(insitu_remote_match{i,size(data,2)+2}) max(insitu_remote_match{i,size(data,2)+2})],...
                             [y_lim(2), y_lim(2)], y_lim(1),'FaceColor', [0.9 0.3 0.3], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
-                        ylabel('iPAR (\muE.m^{-2}.s^{-1})')
+                        ylabel(strrep(sprintf('%s (%s)', varargin{5}{1}, data.Properties.VariableUnits{id_plotinsitu}),'_',' '));
+                        if isempty(data.Properties.VariableUnits{id_plotinsitu})
+                            warning('In-situ unit missing')
+                        end
                         title('Validate match-up (press q) / skip matchup (press s) ');
                         [~, ~, cl] = guiSelectOnTimeSeries(fhv);
                         if any(~isempty(cl))
