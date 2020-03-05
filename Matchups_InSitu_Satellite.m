@@ -261,6 +261,7 @@ for i = 1:NOCfiles
     end
 end
 insitu_remote_match(all(cellfun(@isempty,insitu_remote_match),2),:) = [];
+insitu_remote_match = cell2table(insitu_remote_match,'VariableNames', varnames);
 tmp = matlab.desktop.editor.getActive; cd(fileparts(tmp.Filename));
 save('insitu_remote_match.mat','insitu_remote_match')
 end
