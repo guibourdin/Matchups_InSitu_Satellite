@@ -25,7 +25,7 @@ function insitu_remote_match = Matchups_InSitu_Satellite(data, pathOC, varargin)
 %
 % OUTPUT:
 %   - data_out: <NxM table> of matchups
-% example: insitu_remote_match = Matchups_InSitu_Satellite(par, pathOC, var_to_extract, 5, 180, false, {'par', 'ipar'});
+% example: insitu_remote_match = Matchups_InSitu_Satellite(par, pathOC, var_to_extract, 5, 180, true, {'par', 'ipar'});
 
 if nargin < 1
     error('missing in-situ data & path to OC files')
