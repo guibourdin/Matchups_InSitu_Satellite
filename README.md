@@ -1,3 +1,3 @@
 # Matchups_InSitu_Satellite
 
-# Optional plot requires M_map package
+Optional plot requires M_map package
