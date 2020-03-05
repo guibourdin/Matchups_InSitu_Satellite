@@ -84,7 +84,7 @@ if ~isdatetime(data.dt)
 end
 
 insitu_remote_match = cell(NOCfiles, size(data,2)+5+size(varargin{1},2));
-for i = 231:NOCfiles
+for i = 1:NOCfiles
     cd(pathOC);
     ye = ncread(ncOCfiles(i).name,'/scan_line_attributes/year');
     D = datetime(ye,01,01)+(ncread(ncOCfiles(i).name,'/scan_line_attributes/day')-1);
@@ -260,7 +260,7 @@ for i = 231:NOCfiles
         fprintf('%s - no time match\n',  datestr(median(datetimeOC),'yyyy/mm/dd'))
     end
 end
-insitu_remote_match(cellfun(@isempty,all(insitu_remote_match,2)),:) = [];
+insitu_remote_match(all(cellfun(@isempty,insitu_remote_match),2),:) = [];
 tmp = matlab.desktop.editor.getActive; cd(fileparts(tmp.Filename));
 save('insitu_remote_match.mat','insitu_remote_match')
 end
