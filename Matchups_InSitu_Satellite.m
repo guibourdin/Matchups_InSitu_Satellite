@@ -27,6 +27,13 @@ function insitu_remote_match = Matchups_InSitu_Satellite(data, pathOC, varargin)
 %   - data_out: <NxM table> of matchups
 % example: insitu_remote_match = Matchups_InSitu_Satellite(par, pathOC, var_to_extract, 5, 180, true, {'par', 'ipar'});
 
+cd(pathOC);
+% list NC files in folder
+ncOCfiles = dir('*.nc');
+NOCfiles = length(ncOCfiles); 
+NCinf = ncinfo(ncOCfiles(1).name,'/geophysical_data/');
+remote_varnames = fullfile({NCinf.Variables.Name});
+
 if nargin < 1
     error('missing in-situ data & path to OC files')
 elseif nargin < 2
@@ -35,10 +42,7 @@ elseif nargin < 3
     varargin{2} = 5;
     varargin{3} = 180;
     varargin{4} = false;
-    varargin{1} = {'aot_869','angstrom','Rrs_412','Rrs_443','Rrs_469',...
-        'Rrs_488','Rrs_531','Rrs_547','Rrs_555','Rrs_645','Rrs_667','Rrs_678',...
-        'chlor_a','chl_ocx','Kd_490','pic','poc','ipar','nflh','par',...
-        'l2_flags'};
+    varargin{1} = remote_varnames;
     warning('missing variable to extract; default = all OC variables')
     warning('missing matching area; default = 5x5 pixels')
     warning('missing matching time interval; default = 3h')
@@ -78,11 +82,6 @@ if ~isdatetime(data.dt)
         error('date/time format not recognized')
     end
 end
-
-cd(pathOC);
-% list NC files in folder
-ncOCfiles = dir('*.nc');
-NOCfiles = length(ncOCfiles); 
 
 insitu_remote_match = cell(NOCfiles, size(data,2)+5+size(varargin{1},2));
 for i = 231:NOCfiles
@@ -153,8 +152,13 @@ for i = 231:NOCfiles
                 fprintf('%s - matched with %s\n', datestr(median(data.dt(t_match)),'yyyy/mm/dd'), ncOCfiles(i).name)
                 if all(varargin{4} & size(varargin,2))
                     id_plotinsitu = strcmp(varnames, varargin{5}{1});
+                    if all(~id_plotinsitu)
+                        error('In-situ variable to plot not recognized')
+                    end
                     id_plotremote = strcmp(varnames, varargin{5}{2});
-                    
+                    if all(~id_plotremote)
+                        error('remote variable to plot not recognized')
+                    end
                     if sum(id_plotinsitu)==1
                         x = [min(sellonOC(:)) max(sellonOC(:))];
                         y = [min(latOCini(:)) max(latOCini(:))];
