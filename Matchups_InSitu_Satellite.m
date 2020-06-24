@@ -95,6 +95,7 @@ if ~isdatetime(data.dt)
 end
 
 insitu_remote_match = cell(NOCfiles, size(data,2)+5+size(varargin{1},2));
+unit = cell(1, size(data,2)+5+size(varargin{1},2));
 for i = 1:NOCfiles
     cd(pathOC);
     ye = ncread(ncOCfiles(i).name,'/scan_line_attributes/year');
@@ -103,7 +104,7 @@ for i = 1:NOCfiles
     minu = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/60000-h*60);
     sec = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/1000)-(h*3600+minu*60);
     datetimeOC = datetime(ye,month(D),day(D),h,minu,sec);
-    % identify Tara lat lon for satellite overpass time
+    % identify insitu lat lon for satellite overpass time
     t_match = find(data.dt > datetimeOC(1) - varargin{3}-360 & data.dt < datetimeOC(end) + varargin{3}+360);
     sel_datalon = data.lon(t_match);
     if any(t_match) % if time match
@@ -116,21 +117,6 @@ for i = 1:NOCfiles
         sellonOC(sellonOC<0) = sellonOC(sellonOC<0) + 360;
         sel_datalon(sel_datalon<0) = sel_datalon(sel_datalon<0) + 360;
         % check if tara is in the image
-%         ncdisp(ncOCfiles(i).name)
-%         N_lat = ncreadatt(ncOCfiles(i).name,'/','northernmost_latitude');
-%         S_lat = ncreadatt(ncOCfiles(i).name,'/','southernmost_latitude');
-%         E_lon = ncreadatt(ncOCfiles(i).name,'/','easternmost_longitude');
-%         W_lon = ncreadatt(ncOCfiles(i).name,'/','westernmost_longitude');
-%         N_lat = latOC==max(latOC);
-%         E_lon = sellonOC(:)==max(sellonOC(:));
-%         S_lat = latOC==min(latOC);
-%         W_lon = sellonOC(:)==min(sellonOC(:));
-%         im_lim = [latOC(N_lat), sellonOC(N_lat); latOC(E_lon), sellonOC(E_lon);...
-%             latOC(S_lat), sellonOC(S_lat); latOC(W_lon), sellonOC(W_lon);...
-%             latOC(N_lat), sellonOC(N_lat);];
-%         tara_in_image = inpolygon(sel_datalon,data.lat(t_match),im_lim(:,2),im_lim(:,1));
-%         if all(median(data.lat(t_match)) >= min(latOC) & median(data.lat(t_match)) <= max(latOC)...
-%                 & median(sel_datalon) >= min(sellonOC(:)) & median(sel_datalon) <= max(sellonOC(:))) % if LatLon match
         insitu_in_image = inpolygon([sel_datalon(1); sel_datalon(end)],...
             [data.lat(t_match(1)); data.lat(t_match(end))],sellonOC(:),latOC);
         if all(insitu_in_image) % if LatLon match
@@ -144,8 +130,9 @@ for i = 1:NOCfiles
                 +cos(latOCini(K(1))*pi/180).*cos(latOCini(K(1)+1)*pi/180)...
                 .*cos(abs(lonOCini(K(1))*pi/180-lonOCini(K(1)+1)*pi/180))));%calculate the distance in km
             if min(kmdis) < 1.2*reso_sat % matchup if closest match is closer than 1.2 * satellite resolution
+                temp = cell(1, size(data,2)+5+size(varargin{1},2));
                 for j = 1:size(data,2)
-                    insitu_remote_match{i,j} = data.(data.Properties.VariableNames{j})(t_match);
+                    temp{1,j} = data.(data.Properties.VariableNames{j})(t_match);
                 end
                 remote = cell(size(varargin{1},2),1);
                 unit = cell(1, size(data,2)+5+size(varargin{1},2));
@@ -155,13 +142,15 @@ for i = 1:NOCfiles
                         unit{size(data,2)+4+k} = ncreadatt(ncOCfiles(i).name,['/geophysical_data/' varargin{1}{k}], 'units');
                     catch
                     end
-                    insitu_remote_match{i,size(data,2)+4+k} = remote{k}(K);
+                    temp{1,size(data,2)+4+k} = remote{k}(K);
                 end
-                insitu_remote_match{i,size(data,2)+1} = ncOCfiles(i).name;
-                insitu_remote_match{i,size(data,2)+2} = datetimeOC;
-                insitu_remote_match{i,size(data,2)+3} = latOC(K);
-                insitu_remote_match{i,size(data,2)+4} = lonOC(K);
-                insitu_remote_match{i,end} = kmdis;
+                temp{1,size(data,2)+1} = ncOCfiles(i).name;
+                temp{1,size(data,2)+2} = datetimeOC;
+                temp{1,size(data,2)+3} = latOC(K);
+                temp{1,size(data,2)+4} = lonOC(K);
+                temp{1,end} = kmdis;
+                
+                insitu_remote_match(i,:) = temp;
                 
                 fprintf('%s - matched with %s\n', datestr(median(data.dt(t_match)),'yyyy/mm/dd'), ncOCfiles(i).name)
                 if all(varargin{4} & size(varargin,2))
@@ -203,20 +192,20 @@ for i = 1:NOCfiles
                         set(findobj('tag','m_grid_color'),'facecolor','none');
                         colorbar(ax2,'northoutside','Visible','off');
                         colorbar(ax2,'eastoutside','Visible','off'); hold on
-                        idt = [strcmp(data.Properties.VariableNames,'dt') false(1,size(insitu_remote_match,2)-size(data,2))];
-                        ilat = [strcmp(data.Properties.VariableNames,'lat') false(1,size(insitu_remote_match,2)-size(data,2))];
-                        ilon = [strcmp(data.Properties.VariableNames,'lon') false(1,size(insitu_remote_match,2)-size(data,2))];
-                        insitu_remote_match{i,size(data,2)+4}(insitu_remote_match{i,size(data,2)+4}<0) = insitu_remote_match{i,size(data,2)+4}...
-                            (insitu_remote_match{i,size(data,2)+4}<0)+360;
-                        insitu_remote_match{i,ilon}(insitu_remote_match{i,ilon}<0)...
-                            = insitu_remote_match{i,ilon}(insitu_remote_match{i,ilon}<0)+360;
+                        idt = [strcmp(data.Properties.VariableNames,'dt') false(1,size(temp,2)-size(data,2))];
+                        ilat = [strcmp(data.Properties.VariableNames,'lat') false(1,size(temp,2)-size(data,2))];
+                        ilon = [strcmp(data.Properties.VariableNames,'lon') false(1,size(temp,2)-size(data,2))];
+                        temp{1,size(data,2)+4}(temp{1,size(data,2)+4}<0) = temp{1,size(data,2)+4}...
+                            (temp{1,size(data,2)+4}<0)+360;
+                        temp{1,ilon}(temp{1,ilon}<0)...
+                            = temp{1,ilon}(temp{1,ilon}<0)+360;
                         colorbar(ax2,'northoutside','Visible','off'); cb2 = colorbar(ax2,'eastoutside','FontSize',15);
                         %%%%%%%%%%% change marker size
                         % plot area of match
-%                         m_scatter(insitu_remote_match{i,size(data,2)+4},insitu_remote_match{i,size(data,2)+3},...
+%                         m_scatter(temp{1,size(data,2)+4},temp{1,size(data,2)+3},...
 %                             100,[0.5 0.5 0.5],'filled', 'Marker', 's');
-                        pat = [insitu_remote_match{i,size(data,2)+4}(insitu_remote_match{i,end}>median(insitu_remote_match{i,end}))...
-                            insitu_remote_match{i,size(data,2)+3}(insitu_remote_match{i,end}>median(insitu_remote_match{i,end}))];
+                        pat = [temp{1,size(data,2)+4}(temp{1,end}>median(temp{1,end}))...
+                            temp{1,size(data,2)+3}(temp{1,end}>median(temp{1,end}))];
                         c = mean(pat,1);
                         d = pat-c ;
                         th = atan2(d(:,2),d(:,1));
@@ -230,23 +219,23 @@ for i = 1:NOCfiles
                         end
                         %%%%%%%%%%% change marker size
                         m_gshhs_i('patch',[0.7 0.7 0.7],'edgecolor',[0.7 0.7 0.7],'parent',ax);
-                        sel_match_dt = insitu_remote_match{i,idt} > datetimeOC(1) & insitu_remote_match{i,idt} < datetimeOC(end);
-                        m_scatter(insitu_remote_match{i,ilon}(sel_match_dt),insitu_remote_match{i,ilat}(sel_match_dt),...
-                            100,insitu_remote_match{i,id_plotinsitu}(sel_match_dt),'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5);
-                        m_scatter(insitu_remote_match{i,ilon}(sel_match_dt),insitu_remote_match{i,ilat}(sel_match_dt),...
-                            100,insitu_remote_match{i,id_plotinsitu}(sel_match_dt),'filled');
+                        sel_match_dt = temp{1,idt} > datetimeOC(1) & temp{1,idt} < datetimeOC(end);
+                        m_scatter(temp{1,ilon}(sel_match_dt),temp{1,ilat}(sel_match_dt),...
+                            100,temp{1,id_plotinsitu}(sel_match_dt),'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5);
+                        m_scatter(temp{1,ilon}(sel_match_dt),temp{1,ilat}(sel_match_dt),...
+                            100,temp{1,id_plotinsitu}(sel_match_dt),'filled');
 %                         caxis(ax, [min(min(remote{id_plotremote(size(data,2)+5:end-1)}))...
 %                             max(max(remote{id_plotremote(size(data,2)+5:end-1)}))]);
-%                         caxis(ax2, [min(insitu_remote_match{i,id_plotinsitu})...
-%                             max(insitu_remote_match{i,id_plotinsitu})]);
-                        selday_data = data.dt > median(insitu_remote_match{i,idt}) - days(0.5)...
-                            & data.dt < median(insitu_remote_match{i,idt}) + days(0.5);
+%                         caxis(ax2, [min(temp{1,id_plotinsitu})...
+%                             max(temp{1,id_plotinsitu})]);
+                        selday_data = data.dt > median(temp{1,idt}) - days(0.5)...
+                            & data.dt < median(temp{1,idt}) + days(0.5);
                         fhv=figure(2);
                         set(fhv,'units','normalized','outerposition',[0.5 0.025 0.5 0.975]);
                         scatter(data.dt(selday_data),data.(varargin{5}{1}(8:end))(selday_data),7,'filled'); hold on
-                        scatter(insitu_remote_match{i,idt}(sel_match_dt),insitu_remote_match{i,id_plotinsitu}(sel_match_dt),10,'r','filled');
+                        scatter(temp{1,idt}(sel_match_dt),temp{1,id_plotinsitu}(sel_match_dt),10,'r','filled');
                         y_lim = ylim();
-                        area([min(insitu_remote_match{i,size(data,2)+2}) max(insitu_remote_match{i,size(data,2)+2})],...
+                        area([min(temp{1,size(data,2)+2}) max(temp{1,size(data,2)+2})],...
                             [y_lim(2), y_lim(2)], y_lim(1),'FaceColor', [0.9 0.3 0.3], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
                         ylabel(strrep(sprintf('%s (%s)', varargin{5}{1}, unit{id_plotinsitu}),'_',' '));
                         if isempty(unit{id_plotinsitu})
