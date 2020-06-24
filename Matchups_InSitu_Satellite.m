@@ -269,7 +269,4 @@ if exist('unit','var')
     unit(cellfun(@isempty,unit))={'na'};
     insitu_remote_match.Properties.VariableUnits = unit;
 end
-tmp = matlab.desktop.editor.getActive; cd(fileparts(tmp.Filename));
-save('insitu_remote_match.mat','insitu_remote_match')
-end
 
