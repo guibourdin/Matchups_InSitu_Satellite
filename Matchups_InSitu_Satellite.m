@@ -96,7 +96,7 @@ end
 
 insitu_remote_match = cell(NOCfiles, size(data,2)+5+size(varargin{1},2));
 unit = cell(1, size(data,2)+5+size(varargin{1},2));
-for i = 1:NOCfiles
+parfor i = 1:NOCfiles
     cd(pathOC);
     ye = ncread(ncOCfiles(i).name,'/scan_line_attributes/year');
     D = datetime(ye,01,01)+(ncread(ncOCfiles(i).name,'/scan_line_attributes/day')-1);
@@ -105,7 +105,7 @@ for i = 1:NOCfiles
     sec = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/1000)-(h*3600+minu*60);
     datetimeOC = datetime(ye,month(D),day(D),h,minu,sec);
     % identify insitu lat lon for satellite overpass time
-    t_match = find(data.dt > datetimeOC(1) - varargin{3}-360 & data.dt < datetimeOC(end) + varargin{3}+360);
+    t_match = find(data.dt > datetimeOC(1) - varargin{3} & data.dt < datetimeOC(end) + varargin{3});
     sel_datalon = data.lon(t_match);
     if any(t_match) % if time match
         latOCini = ncread(ncOCfiles(i).name,'/navigation_data/latitude');
