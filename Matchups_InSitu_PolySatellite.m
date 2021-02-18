@@ -1,8 +1,8 @@
-function insitu_remote_match = Matchups_InSitu_Satellite(data, pathOC, varargin)
+function insitu_remote_match = Matchups_InSitu_PolySatellite(data, pathOC, varargin)
 % author: Guillaume Bourdin
 % created: Mar 04, 2020
 
-% Matchups_InSitu_Satellite
+% Matchups_InSitu_Satellite for polymer output
 %
 % INPUT:
 %   - data_in: In-situ data <NxM Table> must contain at least:
@@ -48,8 +48,9 @@ elseif nargin < 3
     varargin{2} = 5;
     varargin{3} = 180;
     varargin{4} = false;
-    NCinf = ncinfo(ncOCfiles(1).name,'/geophysical_data/');
+    NCinf = ncinfo(ncOCfiles(1).name);
     varargin{1} = fullfile({NCinf.Variables.Name});
+    varargin{1}(contains(varargin{1}, {'latitude', 'longitude'})) = [];
     warning('missing variable to extract; default = all variables')
     warning('missing matching area; default = 5x5 pixels')
     warning('missing matching time interval; default = 3h')
@@ -65,7 +66,7 @@ elseif nargin < 5
     varargin{3} = 180;
     varargin{4} = false;
     warning('missing matching time interval; default = 180 minutes')
-    warning('plotset to false')
+    warning('plot set to false')
 elseif nargin < 6
     varargin{4} = false;
     warning('plot set to false')
@@ -79,8 +80,9 @@ end
 
 if isempty(varargin{1})
     warning('missing variable to extract; default = all variables')
-    NCinf = ncinfo(ncOCfiles(1).name,'/geophysical_data/');
+    NCinf = ncinfo(ncOCfiles(1).name);
     varargin{1} = fullfile({NCinf.Variables.Name});
+    varargin{1}(contains(varargin{1}, {'latitude', 'longitude'})) = [];
 end
 
 varnames = [cellfun(@(c)['insitu_' c],data.Properties.VariableNames,'uni',false)...
@@ -103,28 +105,33 @@ local_pool = parpool;
 parfor(i = 1:NOCfiles, local_pool.NumWorkers)
 % for i = 1:NOCfiles
     cd(pathOC);
+    fprintf('Processing %s', ncOCfiles(i).name)
     try 
         if contains(ncOCfiles(i).name, 'L2')
-            ye = ncread(ncOCfiles(i).name,'/scan_line_attributes/year');
-            D = datetime(ye,01,01)+(ncread(ncOCfiles(i).name,'/scan_line_attributes/day')-1);
-            h = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/3600000);
-            minu = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/60000-h*60);
-            sec = floor(ncread(ncOCfiles(i).name,'/scan_line_attributes/msec')/1000)-(h*3600+minu*60);
-            datetimeOC = datetime(ye,month(D),day(D),h,minu,sec);
+            NCinf = ncinfo(ncOCfiles(i).name);
+            att = {NCinf.Attributes.Value}';
+            if any(contains({NCinf.Attributes.Name}', {'start_time', 'stop_time'}))
+                datetimeOC = mean([datetime(att{contains({NCinf.Attributes.Name}', 'start_time')}) ...
+                    datetime(att{contains({NCinf.Attributes.Name}', 'stop_time')})]);
+            elseif any(contains({NCinf.Attributes.Name}', {'sensing_time'}))
+                datetimeOC = datetime(att{contains({NCinf.Attributes.Name}', 'sensing_time')});
+            end
         elseif contains(ncOCfiles(i).name, 'L3m')
+            error('L3 Polymer matchup not implemented yet')
             % exatract lat/lon from L3 images
-            datetimeOC = (datetime(ncreadatt(ncOCfiles(i).name, '/', 'time_coverage_start'), 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'):...
-                minutes(1):...
-                datetime(ncreadatt(ncOCfiles(i).name, '/', 'time_coverage_end'), 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'))';
+%             datetimeOC = (datetime(ncreadatt(ncOCfiles(i).name, '/', 'time_coverage_start'), 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'):...
+%                 minutes(1):...
+%                 datetime(ncreadatt(ncOCfiles(i).name, '/', 'time_coverage_end'), 'InputFormat', 'yyyy-MM-dd''T''HH:mm:ss.SSS''Z'))';
         end
         % identify insitu lat lon for satellite overpass time
         t_match = find(data.dt > datetimeOC(1) - varargin{3} & data.dt < datetimeOC(end) + varargin{3});
         sel_datalon = data.lon(t_match);
         if any(t_match) % if time match
+            fprintf(' - time matched on %s', datestr(median(data.dt(t_match)),'yyyy/mm/dd'))
             if contains(ncOCfiles(i).name, 'L2')
                 % exatract lat/lon from L2 image
-                latOCini = ncread(ncOCfiles(i).name,'/navigation_data/latitude');
-                lonOCini = ncread(ncOCfiles(i).name,'/navigation_data/longitude');
+                latOCini = ncread(ncOCfiles(i).name,'/latitude');
+                lonOCini = ncread(ncOCfiles(i).name,'/longitude');
             elseif contains(ncOCfiles(i).name, 'L3m')
                 % exatract lat/lon from L3 images
                 latv = ncread(ncOCfiles(i).name, '/lat');
@@ -140,7 +147,8 @@ parfor(i = 1:NOCfiles, local_pool.NumWorkers)
             % check if tara is in the image
             insitu_in_image = inpolygon([sel_datalon(1); sel_datalon(end)],...
                 [data.lat(t_match(1)); data.lat(t_match(end))],sellonOC(:),latOC);
-            if all(insitu_in_image) % if LatLon match
+            if all(insitu_in_image) % if all insitu match LatLon are in image
+                fprintf(' Lat/Lon matched')
                 raddisID = acos(sin(median(data.lat(t_match))*pi/180).*sin(latOC*pi/180)...
                     +cos(median(data.lat(t_match))*pi/180).*cos(latOC*pi/180)...
                     .*cos(abs(median(data.lon(t_match))*pi/180-lonOC*pi/180)));%calculate the distance in radians with tsg at for each iteration
@@ -160,13 +168,13 @@ parfor(i = 1:NOCfiles, local_pool.NumWorkers)
                     for k = 1:size(varargin{1},2)
                         if contains(ncOCfiles(i).name, 'L2')
                             % exatract data from L2 image
-                            remote{k} = ncread(ncOCfiles(i).name,['/geophysical_data/' varargin{1}{k}]);
+                            remote{k} = ncread(ncOCfiles(i).name,['/' varargin{1}{k}]);
                         elseif contains(ncOCfiles(i).name, 'L3m')
                             % exatract data from L3 images
                             remote{k} = ncread(ncOCfiles(i).name, ['/' varargin{1}{k}]);
                         end                     
                         try
-                            unit{size(data,2)+4+k} = strrep(ncreadatt(ncOCfiles(i).name,['/geophysical_data/' varargin{1}{k}], 'units'), '^-', '^-^');
+                            unit{size(data,2)+4+k} = strrep(ncreadatt(ncOCfiles(i).name,['/' varargin{1}{k}], 'description'), '^-', '^-^');
                         catch
                         end
                         temp{1,size(data,2)+4+k} = remote{k}(K);
@@ -178,8 +186,9 @@ parfor(i = 1:NOCfiles, local_pool.NumWorkers)
                     temp{1,end} = kmdis;
 
                     insitu_remote_match(i,:) = temp;
+                    
+                    fprintf(' done\n')
 
-                    fprintf('%s - matched with %s\n', datestr(median(data.dt(t_match)),'yyyy/mm/dd'), ncOCfiles(i).name)
                     if all(varargin{4} & size(varargin,2))
                         id_plotinsitu = strcmp(varnames, varargin{5}{1});
                         if all(~id_plotinsitu)
@@ -279,18 +288,18 @@ parfor(i = 1:NOCfiles, local_pool.NumWorkers)
                         end
                     end
                 else
-                    fprintf('%s - No LatLon match with %s lat=%f lon=%f\n', datestr(median(data.dt(t_match)),'yyyy/mm/dd'), ...
-                        ncOCfiles(i).name, median(median(latOC)), median(median(lonOC)))
+                    fprintf(' no LatLon match lat=%f lon=%f\n', ...
+                        median(median(latOC)), median(median(lonOC)))
                 end
             else
-                fprintf('%s - No LatLon match with %s lat=%f lon=%f\n', datestr(median(data.dt(t_match)),'yyyy/mm/dd'), ...
-                    ncOCfiles(i).name, median(median(latOC)), median(median(lonOC)))
+                fprintf(' no LatLon match lat=%f lon=%f\n', ...
+                        median(median(latOC)), median(median(lonOC)))
             end
         else
-            fprintf('%s - no time match\n',  datestr(median(datetimeOC),'yyyy/mm/dd'))
+            fprintf(' no time match\n')
         end
     catch
-        fprintf('%s - corrupted\n',  ncOCfiles(i).name)
+        fprintf(' - corrupted\n')
     end
 %     clear functions
 %     clear latOCini lonOCini sellonOC latOC lonOC
