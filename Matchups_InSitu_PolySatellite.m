@@ -101,6 +101,7 @@ end
 
 insitu_remote_match = cell(NOCfiles, size(data,2)+5+size(varargin{1},2));
 unit = cell(1, size(data,2)+5+size(varargin{1},2));
+delete(gcp('nocreate'))
 local_pool = parpool;
 parfor(i = 1:NOCfiles, local_pool.NumWorkers)
 % for i = 1:NOCfiles
@@ -145,10 +146,11 @@ parfor(i = 1:NOCfiles, local_pool.NumWorkers)
             sellonOC(sellonOC<0) = sellonOC(sellonOC<0) + 360;
             sel_datalon(sel_datalon<0) = sel_datalon(sel_datalon<0) + 360;
             % check if tara is in the image
-            insitu_in_image = inpolygon([sel_datalon(1); sel_datalon(end)],...
-                [data.lat(t_match(1)); data.lat(t_match(end))],sellonOC(:),latOC);
-            if all(insitu_in_image) % if all insitu match LatLon are in image
+            insitu_in_image = inpolygon(sel_datalon, data.lat(t_match), sellonOC(:), latOC);
+            if any(insitu_in_image) % if all insitu match LatLon are in image
                 fprintf(' Lat/Lon matched')
+                % remove tmatch out of image
+                t_match(~insitu_in_image) = [];
                 raddisID = acos(sin(median(data.lat(t_match))*pi/180).*sin(latOC*pi/180)...
                     +cos(median(data.lat(t_match))*pi/180).*cos(latOC*pi/180)...
                     .*cos(abs(median(data.lon(t_match))*pi/180-lonOC*pi/180)));%calculate the distance in radians with tsg at for each iteration
